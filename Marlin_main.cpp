@@ -906,6 +906,7 @@ void set_delta_constants()
 }
 
 void deploy_z_probe() {
+	return;
   feedrate = homing_feedrate[X_AXIS];
   destination[X_AXIS] = z_probe_deploy_start_location[X_AXIS];
   destination[Y_AXIS] = z_probe_deploy_start_location[Y_AXIS];
@@ -927,6 +928,7 @@ void deploy_z_probe() {
 }
 
 void retract_z_probe() {
+	return;
   feedrate = homing_feedrate[X_AXIS];
   destination[Z_AXIS] = 50;
   prepare_move_raw();
@@ -986,7 +988,7 @@ float z_probe() {
   saved_position[Z_AXIS] = float((st_get_position(Z_AXIS)) / axis_steps_per_unit[Z_AXIS]);
 
   feedrate = homing_feedrate[Z_AXIS];
-  destination[Z_AXIS] = mm+2;
+  destination[Z_AXIS] = mm+15;
   prepare_move_raw();
   return mm;
 }
@@ -1044,9 +1046,18 @@ float probe_bed(float x, float y)
   float probe_bed_z, probe_z, probe_h, probe_l;
   int probe_count;
 //  feedrate = homing_feedrate[Z_AXIS];
+//  SERIAL_ECHOPAIR(" bed_level_c:",bed_level_c);
+//  SERIAL_ECHOLN("");
+
   destination[X_AXIS] = x - z_probe_offset[X_AXIS];
   destination[Y_AXIS] = y - z_probe_offset[Y_AXIS];
-  destination[Z_AXIS] = bed_level_c - z_probe_offset[Z_AXIS] + 3;
+  destination[Z_AXIS] = bed_level_c - z_probe_offset[Z_AXIS] + 20;
+  
+//  SERIAL_ECHOPAIR("Move to X:",destination[X_AXIS]);
+//  SERIAL_ECHOPAIR(" Y:",destination[Y_AXIS]);
+//  SERIAL_ECHOPAIR(" Z:",destination[Z_AXIS]);
+//  SERIAL_ECHOLN("");
+  
   prepare_move();
   st_synchronize();
 
@@ -1088,6 +1099,13 @@ float probe_bed(float x, float y)
   SERIAL_PROTOCOL_F(probe_bed_z, 4);
   SERIAL_ECHOLN("");      
   */
+  SERIAL_ECHO("Z-probe:");
+  SERIAL_PROTOCOL_F(probe_bed_z, 2);
+  SERIAL_ECHO(" X:");
+  SERIAL_ECHO(x);
+  SERIAL_ECHO(" Y:");
+  SERIAL_ECHO(y);
+  SERIAL_ECHOLN("");		
 
   return probe_bed_z;
   }
@@ -1589,7 +1607,7 @@ void process_commands()
   
       if (code_seen('A')) 
          {
-         iterations = 100; //Maximum number of iterations
+         iterations = 200; //Maximum number of iterations
          int loopcount = 1;
          float adj_r_target, adj_dr_target;
          float adj_r_target_delta = 0, adj_dr_target_delta = 0;
@@ -1650,18 +1668,14 @@ void process_commands()
             SERIAL_ECHO(loopcount);
             SERIAL_ECHOLN("");
                                  
-            if ((bed_level_c > 3) or (bed_level_c < -3))
-              {
+            if ((bed_level_c > 3) or (bed_level_c < -3)) {
               //Build height is not set correctly .. 
               max_pos[Z_AXIS] -= bed_level_c + 2;
               set_delta_constants();
               SERIAL_ECHOPAIR("Adjusting Z-Height to: ", max_pos[Z_AXIS]);
               SERIAL_ECHOLN(" mm..");
-              } 
-              else
-              {
-              if ((bed_level_x < -ac_prec) or (bed_level_x > ac_prec) or (bed_level_y < -ac_prec) or (bed_level_y > ac_prec) or (bed_level_z < -ac_prec) or (bed_level_z > ac_prec))
-                {  
+            } else {
+              if ((bed_level_x < -ac_prec) or (bed_level_x > ac_prec) or (bed_level_y < -ac_prec) or (bed_level_y > ac_prec) or (bed_level_z < -ac_prec) or (bed_level_z > ac_prec)) {  
                 //Endstops req adjustment
                 SERIAL_ECHOLN("Adjusting Endstops..");
                 endstop_adj[0] += bed_level_x / 1.05;
@@ -1670,25 +1684,20 @@ void process_commands()
                 
                 //Check that no endstop adj values are > 0 (not allowed).. if they are, reduce the build height to compensate.
                 h_endstop = 0;
-                for(int x=0; x < 3; x++)
-                  { 
+                for(int x=0; x < 3; x++) { 
                   if (endstop_adj[x] > h_endstop) h_endstop = endstop_adj[x]; 
-                  }
-                if (h_endstop > 0) 
-                  {
+                }
+                if (h_endstop > 0) {
                   //Reduce build height and adjust endstops
-                  for(int x=0; x < 3; x++)
-                    {
+                  for(int x=0; x < 3; x++) {
                     endstop_adj[x] -= h_endstop + 2;
-                    }
+                  }
                   max_pos[Z_AXIS] -= h_endstop + 2;
                   set_delta_constants();
                   SERIAL_ECHOPAIR("Adjusting Z-Height to: ", max_pos[Z_AXIS]);
                   SERIAL_ECHOLN(" mm..");                
-                  }
                 }
-                else 
-                {
+              } else {
                 SERIAL_ECHOLN("Endstops: OK");
                  
                 adj_r_target = (bed_level_x + bed_level_y + bed_level_z) / 3;
@@ -1741,7 +1750,7 @@ void process_commands()
 
                      tower_adj[0] -= adj_AlphaA;
                      tower_adj[1] -= adj_AlphaB;
-	             tower_adj[2] -= adj_AlphaC;
+	                 tower_adj[2] -= adj_AlphaC;
                      tower_adj[3] += adj_RadiusA;
                      tower_adj[4] += adj_RadiusB;
                      tower_adj[5] += adj_RadiusC;
@@ -1933,17 +1942,15 @@ void process_commands()
                   }
                 }
                        
-                if (loopcount < iterations)
-                  {
+                if (loopcount < iterations){
                   home_delta_axis();
                 
                   //probe bed and display report
                   bed_probe_all();
-		  calibration_report();
+                  calibration_report();
 
                   //Check to see if autocal is complete to within limits..
-                  if (adj_dr_allowed == true)
-                    {
+                  if (adj_dr_allowed == true) {
                     if ((bed_level_x >= -ac_prec) and (bed_level_x <= ac_prec)
                        and (bed_level_y >= -ac_prec) and (bed_level_y <= ac_prec)
                        and (bed_level_z >= -ac_prec) and (bed_level_z <= ac_prec)
@@ -1951,13 +1958,11 @@ void process_commands()
                        and (bed_level_ox >= -ac_prec) and (bed_level_ox <= ac_prec)
                        and (bed_level_oy >= -ac_prec) and (bed_level_oy <= ac_prec)
                        and (bed_level_oz >= -ac_prec) and (bed_level_oz <= ac_prec)) loopcount = iterations;
-                       }
-                    else
-                       {
-                       if ((bed_level_x >= -ac_prec) and (bed_level_x <= ac_prec)
-                          and (bed_level_y >= -ac_prec) and (bed_level_y <= ac_prec)
-                          and (bed_level_z >= -ac_prec) and (bed_level_z <= ac_prec)
-                          and (bed_level_c >= -ac_prec) and (bed_level_c <= ac_prec)) loopcount = iterations;
+                  } else {
+                    if ((bed_level_x >= -ac_prec) and (bed_level_x <= ac_prec)
+                       and (bed_level_y >= -ac_prec) and (bed_level_y <= ac_prec)
+                       and (bed_level_z >= -ac_prec) and (bed_level_z <= ac_prec)
+                       and (bed_level_c >= -ac_prec) and (bed_level_c <= ac_prec)) loopcount = iterations;
                        }
                   }
                   
